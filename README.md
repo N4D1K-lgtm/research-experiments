@@ -1,12 +1,12 @@
 # Research Experiments
 
-Experiments on recursion, formal systems and related topics.
+Experiments on formal systems and related topics.
 
 ## Projects
 
-### [01: Recursion Phase Transitions](projects/01-recursion-phase-transitions/)
+### [01: Structural Emergence Under Basis Extension in Combinatory Logic](projects/01-naming-in-combinatory-logic/)
 
-Exhaustive enumeration and reduction of combinatory logic terms. Looking for the size at which distinct normal forms start collapsing, indicating emergent reusable structure.
+Exhaustive enumeration of combinatory logic terms up to size 7. Measuring what happens to the compression ratio when you name frequent sub-expressions and add them as new primitives.
 
 ## Structure
 

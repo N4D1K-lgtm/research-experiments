@@ -4,12 +4,12 @@ title: About
 permalink: /about/
 ---
 
-# About
+<img src="https://avatars.githubusercontent.com/u/77400755?v=4" alt="Kidan Nelson" style="width: 120px; border-radius: 50%; float: right; margin-left: 20px; margin-bottom: 10px;">
 
-Experiments on recursion and formal systems. The broad question is when and why recursive processes produce structure that's useful for building further structure on top of.
+# Kidan Nelson
 
-The first project uses combinatory logic as a test case because it's minimal (three primitives, one operation, three reduction rules) and Turing complete. If abstraction emerges from recursion in general, it should show up here.
+B.S. Computer Science, University of New Hampshire CEPS. At the [UNH Interoperability Laboratory](https://www.iol.unh.edu/) since 2023.
 
-Other directions I want to look at eventually involve self-narration as a learning mechanism, continuous vs categorical knowledge representation and emergent communication protocols. These are outlined in the [research document](https://github.com/N4D1K-lgtm/research-experiments/blob/main/projects/01-recursion-phase-transitions/RESEARCH.md).
+Interested in the intersection of communication, cognition and computation. How structure arises in formal systems. How naming and abstraction change what a system can express. What that has to do with language and thought.
 
-Nothing here is published. It's just experiments.
+kn1116@usnh.edu / [nelsonkidan@gmail.com](mailto:nelsonkidan@gmail.com) / [github.com/N4D1K-lgtm](https://github.com/N4D1K-lgtm)

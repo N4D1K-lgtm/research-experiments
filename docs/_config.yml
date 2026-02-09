@@ -3,8 +3,8 @@ title: Research Experiments
 description: >-
   Exploring cognition, recursion, and emergent structure through
   computational experiments and formal systems
-author: Your Name
-email: your.email@example.com
+author: Kidan Nelson
+email: kn1116@usnh.edu
 
 # Build settings
 markdown: kramdown
@@ -49,7 +49,7 @@ defaults:
       type: posts
     values:
       layout: default
-      author: Your Name
+      author: Kidan Nelson
 
 # Exclude from processing
 exclude:

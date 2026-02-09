@@ -1,44 +1,205 @@
 ---
 layout: default
-title: "Recursion phase transitions: initial results"
+title: "01: Structural Emergence Under Basis Extension in Combinatory Logic"
 date: 2026-02-09
-categories: [recursion, combinatory-logic]
+categories: [combinatory-logic, naming, compression]
 ---
 
-# Recursion phase transitions: initial results
+# Structural Emergence Under Basis Extension in Combinatory Logic
 
-I'm generating all combinatory logic terms at each size, reducing them to normal form and counting how many distinct results there are.
+[PDF version]({{ site.baseurl }}/assets/posts/01/paper.pdf).
 
-The reduction rules are just:
+## Setup
 
-```
-I x      -> x
-K x y    -> x
-S x y z  -> x z (y z)
-```
+Combinatory logic has three primitives (S, K, I) and one operation (application). The reduction rules are:
 
-A term's "size" is the number of S/K/I leaves in its tree. At size N there are Catalan(N-1) * 3^N possible terms.
+$$
+\begin{aligned}
+I \; x &\to x \\
+K \; x \; y &\to x \\
+S \; x \; y \; z &\to x \; z \; (y \; z)
+\end{aligned}
+$$
 
-## Results so far
+A term's size is its number of combinator leaves. At size $N$ there are $C_{N-1} \cdot 3^N$ possible terms, where $C_n$ is the $n$-th Catalan number. This grows fast: 3 terms at size 1, 288,684 at size 7.
 
-| Size | Total Terms | Distinct Normal Forms | Compression Ratio |
-|------|-------------|-----------------------|-------------------|
-| 1    | 3           | 3                     | 1.000             |
-| 2    | 9           | 8                     | 0.889             |
-| 3    | 54          | 42                    | 0.778             |
-| 4    | 405         | 276                   | 0.681             |
-| 5    | 3,402       | 1,847                 | 0.543             |
-| 6    | 30,618      | 12,304                | 0.402             |
-| 7    | 288,684     | ?                     | ?                 |
+I enumerated every term up to size 7, reduced each to normal form (with a 10,000 step limit and 50,000 atom size limit for divergent terms) and measured four things:
 
-The ratio drops faster than linear. Between sizes 4 and 6 it goes from 0.68 to 0.40. That means by size 6, more than half of all terms reduce to a normal form that some other term also reduces to.
+1. **Compression ratio**: distinct normal forms / total terms. If this drops, many terms are collapsing into the same structures.
+2. **Motif count**: sub-expressions appearing in normal forms at size $N$ that didn't appear at any smaller size.
+3. **Reuse value**: description-length savings if you named a common sub-expression as a new primitive.
+4. **Reduction steps**: how much work each term requires to reach normal form (analogous to Bennett's logical depth).
 
-## What I'm looking at next
+Implementation is in Rust with rayon for parallelism. All results stored in SQLite. [Source code](https://github.com/N4D1K-lgtm/research-experiments/tree/main/projects/01-naming-in-combinatory-logic).
 
-The interesting question is which structures are absorbing all these terms. If the common normal forms turn out to be things like B (composition, `S(KS)K`), C (flip) or W (duplication, `SS(SK)`), that would suggest the reduction dynamics naturally surface useful combinators without anyone designing them to.
+## Baseline results
 
-I also want to compare this to iterative generation (only applying rules to the previous generation, not all prior generations) to see if recursion specifically is what causes the compression.
+| $N$ | Total terms | Distinct NFs | $\rho(N)$ | Divergent | Explosive | New motifs | Avg steps |
+|-----|-------------|--------------|-----------|-----------|-----------|------------|-----------|
+| 1   | 3           | 3            | 1.0000    | 0         | 0         | 3          | 0.00      |
+| 2   | 9           | 9            | 1.0000    | 0         | 0         | 6          | 0.33      |
+| 3   | 54          | 30           | 0.5556    | 0         | 0         | 21         | 0.72      |
+| 4   | 405         | 108          | 0.2667    | 0         | 0         | 78         | 1.19      |
+| 5   | 3,402       | 438          | 0.1287    | 0         | 0         | 330        | 1.69      |
+| 6   | 30,618      | 1,920        | 0.0627    | 5         | 0         | 1,483      | 2.22      |
+| 7   | 288,684     | 8,706        | 0.0302    | 128       | 44        | 6,803      | 2.75      |
 
-## Code
+The compression ratio decays exponentially for $N \ge 3$:
 
-Written in Rust with rayon for parallelism. [Source](https://github.com/N4D1K-lgtm/research-experiments/tree/main/projects/01-recursion-phase-transitions).
+$$\rho(N) \approx e^{-0.727 N}$$
+
+with $R^2 = 1.000$. At each size increment, roughly half the expressive distinctness is lost. The total term count grows super-exponentially, while distinct normal forms grow at about $3.82\times$ per size. The normal forms grow fast, but not fast enough to keep up.
+
+![Compression decay]({{ site.baseurl }}/assets/posts/01/fig1_compression_decay.png)
+
+### The transition cascade
+
+The transition from trivial to complex behavior isn't one event. It's a sequence:
+
+1. **Size 1-2**: Every term reduces to a distinct normal form ($\rho = 1.0$). No combinator has enough arguments to fire.
+2. **Size 3**: $K$ starts firing, discarding arguments. $K \; S \; K \to S$, etc. Compression ratio drops to 0.556.
+3. **Size 4**: $S$ starts firing, distributing and duplicating. Ratio drops to 0.267.
+4. **Size 5-6**: Inner reductions become common. Average step count goes from 1.19 to 2.22.
+5. **Size 6**: First divergent terms appear. Five terms fail to normalize within 10,000 steps.
+6. **Size 7**: First explosive terms. 44 terms grow beyond 50,000 atoms during reduction.
+
+![Transition cascade]({{ site.baseurl }}/assets/posts/01/fig9_cascade.png)
+
+### Attractor normal forms
+
+The distribution of normal form multiplicities (how many input terms reduce to each distinct normal form) follows a power law with exponent $\alpha \approx 1.5$.
+
+The identity combinator $I$ is the strongest attractor at size 7: 19,864 terms (6.9% of all normalizing terms) reduce to it. $K$ and $S$ follow at 6.5% and 6.3%. The three atoms collectively absorb 19.7% of all normalizing terms. The next tier (size-2 normal forms $KK$, $KI$, $SI$, $SS$, $SK$, $KS$) each absorb about 3.5%.
+
+| Normal Form | Multiplicity | % of normalizing |
+|-------------|--------------|------------------|
+| I           | 19,864       | 6.9%             |
+| K           | 18,880       | 6.5%             |
+| S           | 18,171       | 6.3%             |
+| KK          | 10,629       | 3.7%             |
+| KI          | 10,177       | 3.5%             |
+| SI          | 10,105       | 3.5%             |
+| SS          | 10,000       | 3.5%             |
+| SK          | 9,785        | 3.4%             |
+| KS          | 9,201        | 3.2%             |
+| SII         | 3,658        | 1.3%             |
+| K(KK)       | 3,459        | 1.2%             |
+| S(SS)       | 3,317        | 1.1%             |
+| SSS         | 3,267        | 1.1%             |
+| SKK         | 3,197        | 1.1%             |
+| K(SK)       | 3,124        | 1.1%             |
+
+![Normal form distribution at size 7]({{ site.baseurl }}/assets/posts/01/fig4_nf_distribution_s7.png)
+
+### Motif reuse
+
+The top motifs by reuse savings at each size are dominated by S-headed sub-expressions. At size 7 the top three are $SS$, $SI$ and $SK$, each appearing in over 3,100 distinct normal forms. The reuse savings grow from 1 at size 2 to over 4,000 at size 7.
+
+![Motif reuse savings]({{ site.baseurl }}/assets/posts/01/fig5_motif_reuse.png)
+
+## The naming experiment
+
+After the baseline, I selected motifs and added each one as a new primitive to the basis. For each motif $m$, the basis becomes $\{S, K, I, m\}$ and I re-enumerate and reduce all terms at sizes 1-6.
+
+The motif gets an effective arity based on how many arguments its head combinator still needs. For example $SS$ has head $S$ which needs 3 arguments, one of which ($S$) is already supplied, so the effective arity is 2. When the motif accumulates enough arguments during reduction it expands to its CL definition. When it doesn't, it stays in normal form as an opaque primitive.
+
+I tested 11 single motifs: 8 S-headed ($SS$, $SK$, $SI$, $S(SS)$, $SII$, $SKK$, $S(KS)$, $S(KI)$) and 3 K-headed ($KS$, $KK$, $KI$).
+
+### Single motif results
+
+| Motif | Head | $D(6)$ | $\rho(6)$ | Advantage | Divg% | Expl% |
+|-------|------|--------|-----------|-----------|-------|-------|
+| Baseline (SKI) | -- | 1,920 | 0.0627 | 1.000x | 0.0% | 0.0% |
+| $S(SS)$ | $S$ | 18,174 | 0.1056 | 1.685x | 1.8% | 6.8% |
+| $SS$ | $S$ | 17,346 | 0.1008 | 1.608x | 0.4% | 1.1% |
+| $SI$ | $S$ | 10,697 | 0.0622 | 0.992x | 1.1% | 1.8% |
+| $S(KS)$ | $S$ | 9,728 | 0.0565 | 0.902x | 0.0% | 0.0% |
+| $S(KI)$ | $S$ | 9,294 | 0.0540 | 0.862x | 0.0% | 0.0% |
+| $SK$ | $S$ | 9,284 | 0.0540 | 0.861x | 0.0% | 0.0% |
+| $SII$ | $S$ | 4,703 | 0.0273 | 0.436x | 16.7% | 0.6% |
+| $SKK$ | $S$ | 3,642 | 0.0212 | 0.338x | 0.0% | 0.0% |
+| $KS$ | $K$ | 3,636 | 0.0211 | 0.337x | 0.0% | 0.0% |
+| $KK$ | $K$ | 3,636 | 0.0211 | 0.337x | 0.0% | 0.0% |
+| $KI$ | $K$ | 3,636 | 0.0211 | 0.337x | 0.0% | 0.0% |
+
+![Motif comparison]({{ site.baseurl }}/assets/posts/01/fig6_motif_comparison.png)
+
+The 11 motifs separate into four groups:
+
+**Winners (>1.0x): $S(SS)$ and $SS$.** Both slow compression decay substantially. $S(SS)$ achieves the best advantage (1.685x) with decay rate $e^{-0.605N}$ vs the baseline's $e^{-0.727N}$. Both have spines consisting entirely of $S$ combinators.
+
+**Neutral (~1.0x): $SI$.** Essentially matches the baseline at 0.992x. Introduces moderate non-normalization (2.9%) without compensating gain.
+
+**Mild losers (0.86-0.90x): $S(KS)$, $S(KI)$, $SK$.** S-headed but with $K$ in the spine, which partially neutralizes the distributing effect of $S$.
+
+**Strong losers (<0.44x): $SII$, $SKK$, $KS$, $KK$, $KI$.** The three K-headed motifs are identically harmful: they produce exactly the same 3,636 distinct normal forms at every size, because $Kx$ for any $x$ is a constant function ($Kx \; y \to x$). $KS$, $KK$ and $KI$ are interchangeable as basis extensions.
+
+$SKK$ computes the identity ($SKK \; x \to x$), duplicating the role of $I$. Strictly redundant.
+
+$SII$ is the most interesting failure. It's the self-application combinator ($SII \; x \to xx$) and the building block of the looping term $\Omega = SII \; (SII)$. It's S-headed with no $K$ in the spine, so by the structural criteria it should do well. But 17.3% of terms at size 6 fail to normalize. The non-normalization rate overwhelms the expressiveness gain.
+
+![Motif ranking]({{ site.baseurl }}/assets/posts/01/fig8_motif_ranking.png)
+
+### What determines motif value
+
+Plotting compression advantage against non-normalizing rate reveals the structure:
+
+1. **Head combinator sets the floor.** Every K-headed motif is below 0.337x. No exceptions.
+2. **Spine content sets the ceiling (for S-headed motifs).** S-only spines ($SS$, $S(SS)$) are the only winners. Introducing $K$ into the spine drops you below 1.0. S-rich spines distribute further combinatorial structure when $S$ fires. K-rich spines distribute discarders.
+3. **Self-application is costly.** $SII$ shows that even favorable structural properties can't save you if you cause too much divergence.
+
+![Classification]({{ site.baseurl }}/assets/posts/01/fig10_classification.png)
+
+![Taxonomy heatmap]({{ site.baseurl }}/assets/posts/01/fig12_taxonomy.png)
+
+## Combination experiments
+
+To test whether motif benefits compound, I ran 4 pairs ($k=5$ basis, sizes 1-6) and 2 triples ($k=6$ basis, sizes 1-5).
+
+| Combination | $N$ | $k$ | $D(N)$ | $\rho(N)$ | Advantage | Expected | Ratio |
+|-------------|-----|-----|--------|-----------|-----------|----------|-------|
+| $\{SS, S(SS)\}$ | 6 | 5 | 80,252 | 0.1223 | 1.950x | 2.710x | 0.72 |
+| $\{SS, KS\}$ | 6 | 5 | 26,990 | 0.0411 | 0.656x | 0.542x | 1.21 |
+| $\{SS, SII\}$ | 6 | 5 | 29,291 | 0.0446 | 0.712x | 0.701x | 1.02 |
+| $\{S(SS), SII\}$ | 6 | 5 | 29,258 | 0.0446 | 0.711x | 0.734x | 0.97 |
+| $\{SS, S(SS), SII\}$ | 5 | 6 | 12,932 | 0.1188 | 0.923x | 1.147x | 0.80 |
+| $\{SS, SK, KS\}$ | 5 | 6 | 9,498 | 0.0872 | 0.678x | 0.546x | 1.24 |
+
+![Combination interactions]({{ site.baseurl }}/assets/posts/01/fig11_combo_interactions.png)
+
+**The best pair is sub-multiplicative.** $\{SS, S(SS)\}$ achieves the highest advantage of any experiment at 1.950x, but the product of their individual advantages is 2.710x. It only reaches 72% of that. Both motifs expand the same region of computational space (S-distributing with S-rich spines), so there are diminishing returns.
+
+**Harmful motifs are less harmful when paired with strong ones.** $\{SS, KS\}$ achieves 1.21x the expected product. The strong motif partially compensates.
+
+**$SII$ drags down any combination.** Every combination involving $SII$ underperforms. $\{SS, SII\}$ has 18.8% non-normalizing terms, $\{S(SS), SII\}$ has 27.4%.
+
+## Discussion
+
+Every experiment exhibits exponential compression decay with $R^2 \ge 0.996$. The rate varies from $-0.572$ for the best combination to $-0.900$ for the worst single motifs. This suggests exponential decay is structural (driven by the super-exponential growth of the input space) while the specific rate depends on the basis.
+
+Whether iterating the naming process can push the decay rate toward zero, or whether there's a fundamental floor, is open.
+
+The average reduction steps increase monotonically (0 at size 1 to 2.75 at size 7 in the baseline). But the max steps are more revealing: 23 in the baseline at size 7, but 9,174 for $S(SS)$ and 2,292 for $SS$ at size 6. The extended bases amplify logical depth because the named motifs create more opportunities for $S$ to fire.
+
+### Limitations
+
+- **Size ceiling.** Exhaustive enumeration reaches size 7 for baseline, size 6 for single-motif experiments, size 5 for triples. Larger sizes would strengthen the fits.
+- **Fuel sensitivity.** Terms classified as divergent might normalize given more steps. The 10,000 step limit is generous for the baseline (max normalizing = 23) but the extended bases push much higher.
+- **Basis size confound.** A $k=5$ experiment at size 6 enumerates 3.8x more terms than $k=4$. The compression ratio accounts for this (divides by total terms) but the search space interpretation differs.
+- **Syntactic identity only.** Normal forms are compared by syntactic equality. Classifying them by computational behavior (which ones are projections, composition operators, etc.) might reveal more.
+
+## What's next
+
+- **Iterative naming.** Add the best motif, re-survey, add the next best. Does the advantage compound indefinitely or hit a fixed point?
+- **Semantic classification.** Identify which normal forms are projections, composition operators, etc., rather than just comparing syntax.
+- **Larger sizes.** Size 8+ using sampling rather than exhaustive enumeration.
+- **Comparison to library learning.** The bottom-up motif evaluation done here is complementary to DreamCoder's top-down neural-guided approach. A direct comparison on shared benchmarks would be interesting.
+
+## References
+
+- Bennett, C. H. (1988). Logical depth and physical complexity. In *The Universal Turing Machine: A Half-Century Survey*, 227-257.
+- Ellis, K. et al. (2021). DreamCoder: building libraries of compositional abstractions. *PLDI 2021*.
+- Hindley, J. R. and Seldin, J. P. (2008). *Lambda-Calculus and Combinators: An Introduction*. Cambridge.
+- Li, M. and Vitanyi, P. (2019). *An Introduction to Kolmogorov Complexity and Its Applications*. Springer, 4th ed.
+- Mezard, M. and Montanari, A. (2009). *Information, Physics, and Computation*. Oxford.
+- Tromp, J. (2014). Binary lambda calculus and combinatory logic. In *Randomness and Complexity, from Leibniz to Chaitin*, 237-260.
