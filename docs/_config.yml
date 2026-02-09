@@ -1,0 +1,69 @@
+# Site settings
+title: Research Experiments
+description: >-
+  Exploring cognition, recursion, and emergent structure through
+  computational experiments and formal systems
+author: Your Name
+email: your.email@example.com
+
+# Build settings
+markdown: kramdown
+remote_theme: ankitsultana/researcher@gem
+
+# URL settings
+baseurl: "/research-experiments"
+url: "https://n4d1k-lgtm.github.io"
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# Navigation (researcher theme uses "name" and "link")
+nav:
+  - name: "Home"
+    link: "/research-experiments/"
+  - name: "Projects"
+    link: "/research-experiments/projects"
+  - name: "Blog"
+    link: "/research-experiments/blog"
+  - name: "About"
+    link: "/research-experiments/about"
+
+# Footer
+footer: yes
+footer_url: "https://github.com/N4D1K-lgtm"
+footer_text: "Research Experiments"
+
+# Collections for blog posts
+collections:
+  posts:
+    output: true
+    permalink: /blog/:year/:month/:day/:title/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: default
+      author: Your Name
+
+# Exclude from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - .gitignore
+  - README.md
+
+# Math rendering
+kramdown:
+  math_engine: mathjax
+  syntax_highlighter: rouge

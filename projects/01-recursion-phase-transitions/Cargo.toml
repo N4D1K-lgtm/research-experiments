@@ -1,0 +1,9 @@
+[package]
+name = "strange-loops"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+indicatif = "0.18.3"
+rayon = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }

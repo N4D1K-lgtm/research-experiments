@@ -1,0 +1,1073 @@
+\documentclass[11pt, a4paper]{article}
+
+% ── packages ──────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{natbib}
+\usepackage{enumitem}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=green!50!black,
+  urlcolor=blue!70!black,
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem{hypothesis}{Hypothesis}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  breaklines=true,
+}
+
+% ── metadata ──────────────────────────────────────────────────────
+\title{Phase Transitions in Combinatory Logic:\\
+  An Exhaustive Study of Structural Emergence\\
+  under Basis Extension}
+\author{Kidan Nelson}
+\date{February 2026}
+
+\begin{document}
+\maketitle
+
+% ══════════════════════════════════════════════════════════════════
+\begin{abstract}
+	We exhaustively enumerate and reduce all combinatory logic (CL) terms up to
+	size~7 in the standard $\{S,K,I\}$ basis (323{,}175 terms total) and measure
+	four metrics of structural emergence: normal form compression ratio,
+	sub-expression frequency distribution, motif count and compositional reuse
+	value.  We find that the compression ratio $\rho(N)$ decays exponentially as
+	$e^{-0.727N}$ ($R^2 = 1.000$), with a cascade of transitions: compression
+	onset at size~3 (when $K$ begins discarding), divergence onset at size~6
+	and term explosion at size~7.  The normal form multiplicity distribution
+	follows a power law with exponent $\alpha \approx 1.5$, with the identity
+	combinator $I$ as the strongest attractor (6.9\% of all normalizing terms
+	at size~7).
+
+	We then conduct a systematic \emph{naming experiment}: we add 11 individual
+	motifs and 6 multi-motif combinations as new basis elements and re-enumerate
+	to measure the effect on compression decay.  Of the 11 motifs, only two
+	produce a compression advantage above $1.0\times$: $S(SS)$ at
+	$1.68\times$ and $SS$ at $1.61\times$, both slowing the exponential decay
+	rate.  The remaining 9 motifs are neutral or harmful.  All three $K$-headed
+	motifs produce identical compression ratios and accelerate decay to
+	$e^{-0.900N}$.  $SII$, the self-application combinator, is $S$-headed but
+	harmful ($0.44\times$) due to a 17.3\% non-normalization rate.  Pairing the
+	two best motifs ($SS + S(SS)$) yields $1.95\times$ advantage, but this is
+	sub-multiplicative relative to the product of their individual gains.  These
+	results show that the value of a basis extension depends on the specific
+	reduction behavior of the added primitive, not on syntactic properties alone.
+\end{abstract}
+
+% ══════════════════════════════════════════════════════════════════
+\section{Introduction}
+\label{sec:intro}
+
+We study the following question: \emph{when a recursive rewriting system is
+	enumerated exhaustively, how does the relationship between syntactic
+	complexity and semantic variety change as terms grow larger?}  Specifically,
+we ask whether naming a frequently occurring sub-expression and adding it
+to the system's primitives measurably changes this relationship.
+
+Our formal system is combinatory logic (CL), which consists of three
+primitive combinators $S$, $K$, $I$ and a single binary operation
+(application).  Despite this minimal syntax, CL is Turing-complete: every
+computable function can be expressed as a CL term \citep{hindley2008}.
+This makes it a useful substrate for studying how the space of reachable
+computations changes under basis extension, because the system is simple
+enough to enumerate exhaustively at small sizes yet powerful enough to
+exhibit non-trivial computational phenomena including non-termination.
+
+Our approach is straightforward.  We enumerate \emph{every} CL term up to
+a given size, reduce each to its normal form (or classify it as divergent)
+and measure structural properties of the resulting population.  We then
+select frequently occurring sub-expressions (``motifs''), add them as new
+primitives and re-run the survey to measure the effect.
+
+This connects to several lines of prior work:
+
+\begin{itemize}[nosep]
+	\item \textbf{Algorithmic information theory.}  The compression ratio
+	      measures how many distinct outputs a system produces relative to its input
+	      space, which is related to Kolmogorov complexity \citep{li2019}.
+	      Enumeration-based approaches to studying term spaces have been applied in
+	      the binary lambda calculus \citep{tromp2014}, where similar compression
+	      phenomena appear.
+	\item \textbf{Logical depth.}  The number of reduction steps to reach normal
+	      form is a measure of computational content, analogous to Bennett's logical
+	      depth \citep{bennett1988}.
+	\item \textbf{Library learning.}  The naming experiment mirrors the
+	      abstraction-learning loop in systems like DreamCoder \citep{ellis2021},
+	      but conducted exhaustively and bottom-up rather than heuristically and
+	      top-down.  Where DreamCoder uses neural guidance to select which
+	      sub-expressions to name, we test all candidates and measure the effect of
+	      each.
+	\item \textbf{Phase transitions in combinatorics.}  The sharp onset of
+	      divergence and the exponential decay of compression resemble phase
+	      transitions studied in random satisfiability and random graph theory
+	      \citep{mezard2009}.
+\end{itemize}
+
+The paper proceeds as follows. Section~\ref{sec:background} defines the
+formal system and metrics.  Section~\ref{sec:method} describes the
+computational methodology.  Section~\ref{sec:results} presents results for
+the baseline survey, the naming experiment across 11 motifs, a motif
+classification analysis and multi-motif combination experiments.
+Section~\ref{sec:discussion} interprets these findings.
+Section~\ref{sec:conclusion} summarizes results and outlines future work.
+
+
+% ══════════════════════════════════════════════════════════════════
+\section{Background and Definitions}
+\label{sec:background}
+
+\subsection{Combinatory Logic}
+
+\begin{definition}[CL Term]
+	A \emph{combinatory logic term} over a basis $\mathcal{B}$ is defined
+	inductively:
+	\begin{enumerate}[nosep]
+		\item Every $b \in \mathcal{B}$ is a term (an \emph{atom}).
+		\item If $M$ and $N$ are terms, then $(M\;N)$ is a term (\emph{application}).
+	\end{enumerate}
+	The standard basis is $\mathcal{B}_0 = \{S, K, I\}$.
+\end{definition}
+
+\begin{definition}[Reduction Rules]
+	The reduction rules for $S$, $K$, $I$ are:
+	\begin{align}
+		I\;x       & \to x \label{eq:I}            \\
+		K\;x\;y    & \to x \label{eq:K}            \\
+		S\;x\;y\;z & \to x\;z\;(y\;z) \label{eq:S}
+	\end{align}
+	where application is left-associative: $M\;N\;P$ means $((M\;N)\;P)$.
+\end{definition}
+
+The three combinators have distinct computational roles:
+\begin{itemize}[nosep]
+	\item $I$ is the identity: it passes its argument through unchanged.
+	\item $K$ is the constant-maker (or \emph{discarder}): it takes two arguments
+	      and returns the first, discarding the second.
+	\item $S$ is the \emph{distributor}: it takes three arguments and applies the
+	      first and second to the third, then applies the results to each other.
+	      Crucially, $S$ \emph{duplicates} its third argument.
+\end{itemize}
+
+\begin{definition}[Term Size]
+	The \emph{size} of a CL term, written $|t|$, is the number of combinator
+	leaves (atoms):
+	$|b| = 1$ for $b \in \mathcal{B}$, and $|M\;N| = |M| + |N|$.
+\end{definition}
+
+\begin{definition}[Enumeration Count]
+	The number of distinct CL terms of size $N$ over a basis of size $k$ is:
+	\begin{equation}
+		T(N) = C_{N-1} \cdot k^N
+		\label{eq:enumcount}
+	\end{equation}
+	where $C_n = \frac{1}{n+1}\binom{2n}{n}$ is the $n$-th Catalan number
+	(counting full binary tree shapes with $N$ leaves) and $k^N$ assigns each
+	leaf to one of $k$ basis elements.
+\end{definition}
+
+For the standard basis ($k=3$), this gives:
+
+\begin{center}
+	\begin{tabular}{r r r r}
+		\toprule
+		$N$ & $C_{N-1}$ & $3^N$   & $T(N)$    \\
+		\midrule
+		1   & 1         & 3       & 3         \\
+		2   & 1         & 9       & 9         \\
+		3   & 2         & 27      & 54        \\
+		4   & 5         & 81      & 405       \\
+		5   & 14        & 243     & 3{,}402   \\
+		6   & 42        & 729     & 30{,}618  \\
+		7   & 132       & 2{,}187 & 288{,}684 \\
+		\bottomrule
+	\end{tabular}
+\end{center}
+
+
+\subsection{Reduction Strategy}
+
+We use \emph{normal-order reduction} (leftmost outermost redex first),
+which is the standard strategy for computing full normal forms in CL
+\citep{hindley2008}.  A term is in \emph{normal form} if no reduction rule
+applies at any position.
+
+Not all CL terms have normal forms.  For example,
+$\Omega = S\;I\;I\;(S\;I\;I)$ reduces to itself indefinitely.  We handle
+non-termination with two limits:
+
+\begin{itemize}[nosep]
+	\item \textbf{Fuel limit} $L = 10{,}000$: maximum reduction steps before
+	      declaring a term \emph{divergent}.
+	\item \textbf{Size limit} $M = 50{,}000$: if the term grows beyond $M$ atoms
+	      during reduction, we declare it \emph{explosive}.
+\end{itemize}
+
+These limits are chosen to be well beyond what any normalizing term at size
+$\le 7$ requires (the maximum observed step count for a normalizing term was
+23 in the baseline experiment).
+
+
+\subsection{Metrics}
+\label{sec:metrics}
+
+We define four metrics for characterizing structural emergence.
+
+\begin{definition}[Compression Ratio]
+	Let $T(N)$ be the total number of CL terms of size $N$ and $D(N)$ the number
+	of \emph{distinct} normal forms among those that normalize. The compression
+	ratio is:
+	\begin{equation}
+		\rho(N) = \frac{D(N)}{T(N)}
+		\label{eq:compression}
+	\end{equation}
+	A value of $\rho(N) = 1$ means every term reduces to a unique normal form
+	(no compression). A value near 0 means many terms collapse to the same
+	structures, which we call \emph{attractors}.
+\end{definition}
+
+\begin{definition}[Motif Count]
+	A sub-expression $e$ is a \emph{motif at size $N$} if $e$ appears as a
+	sub-term of some normal form at size $N$ but $e$ did not appear in any
+	normal form at sizes $< N$.  The motif count $\mu(N)$ is the number of such
+	novel sub-expressions.
+\end{definition}
+
+\begin{definition}[Compositional Reuse Value]
+	For a candidate sub-expression $e$ appearing in the normal forms at size $N$,
+	define:
+	\begin{itemize}[nosep]
+		\item $f(e)$: the number of occurrences of $e$ across all normal forms
+		\item $n(e)$: the number of distinct normal forms containing $e$
+		\item $\sigma(e) = f(e) \cdot (|e| - 1)$: the description-length savings if
+		      $e$ were named as a new primitive (each occurrence saves $|e|-1$ atoms)
+	\end{itemize}
+	This measures whether $e$ is useful as a building block.
+\end{definition}
+
+\begin{definition}[Logical Depth]
+	The number of reduction steps $s(t)$ to reach normal form (for normalizing
+	terms) is a measure analogous to Bennett's logical depth
+	\citep{bennett1988}: the computational work required to produce a term's
+	normal form.  We report the average $\overline{s}(N)$ and maximum
+	$s_{\max}(N)$ across all normalizing terms at each size.
+\end{definition}
+
+
+% ══════════════════════════════════════════════════════════════════
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Implementation}
+
+The experiment is implemented in Rust (edition 2024), using the \texttt{rayon}
+crate for parallelized reduction.  Terms are represented as an algebraic data
+type using reference-counted pointers (\texttt{Arc<Term>}) with cached sizes,
+ensuring $O(1)$ cloning and $O(1)$ size queries during reduction.  This is
+critical for performance on the $S$ combinator's duplication rule.
+
+All results are stored in a SQLite database with resume support.  Each
+experiment records the basis, fuel limit and size limit as metadata, and each
+size's reductions are committed in a single transaction before proceeding to
+the next size.
+
+
+\subsection{Enumeration}
+
+For each size $N$, we enumerate all CL terms by generating every full binary
+tree shape with $N$ leaves (there are $C_{N-1}$ such shapes) and assigning
+each leaf to each basis element independently.  This produces exactly
+$T(N) = C_{N-1} \cdot k^N$ terms where $k = |\mathcal{B}|$.
+
+For the extended-basis experiments, $k$ depends on the number of named
+motifs: $k=4$ for single motifs (172{,}032 terms at size 6), $k=5$ for
+pairs (656{,}250 terms at size 6) and $k=6$ for triples (109{,}350 terms
+at size 5).  Triples are enumerated only to size~5 to keep the computation
+tractable.
+
+
+\subsection{Reduction}
+
+Each term is reduced independently using normal-order reduction.  The
+reduction engine works by decomposing each term into its \emph{spine}: the
+chain of left-nested applications leading to the head combinator.  It then
+checks whether the head has enough arguments for its reduction rule to fire.
+
+Specifically, a term $t$ is decomposed as $h\;a_1\;\ldots\;a_n$ where $h$ is
+the head (an atom) and $a_1, \ldots, a_n$ are the spine arguments.  If $h$
+has enough arguments:
+\begin{itemize}[nosep]
+	\item $I$: needs 1 argument, returns $a_1$ (with remaining args re-applied)
+	\item $K$: needs 2 arguments, returns $a_1$ (discarding $a_2$)
+	\item $S$: needs 3 arguments, returns $a_1\;a_3\;(a_2\;a_3)$
+\end{itemize}
+
+If the outermost spine has no redex, the engine recurses into sub-terms
+(left child first, then right) to find the leftmost innermost redex.  This
+ensures normal-order evaluation while still computing \emph{full} normal
+forms (reducing under lambda-like positions).
+
+
+\subsection{The Naming Experiment}
+\label{sec:naming}
+
+After the baseline survey, we select motifs discovered through the reuse
+value analysis and run additional experiments.  For each motif $m$:
+
+\begin{enumerate}[nosep]
+	\item We add $m$ as a new library combinator $\#0$ with its
+	      \emph{effective arity}: the number of additional arguments needed before
+	      the head combinator of $m$'s expansion can fire.
+	      For example, $SS$ has head $S$ which needs 3 arguments, of which 1
+	      ($S$) is already provided, so the effective arity is 2.
+	\item We extend the basis: $\mathcal{B}_m = \{S, K, I, \#0\}$.
+	\item We re-enumerate and reduce all terms of sizes 1--6 using
+	      $\mathcal{B}_m$.
+\end{enumerate}
+
+When $\#0$ accumulates enough arguments during reduction, it expands to its
+CL definition and reduces normally.  When it has fewer arguments than its
+arity, it remains in normal form as an opaque primitive.
+
+We test 11 single motifs:
+\begin{itemize}[nosep]
+	\item \textbf{$S$-headed (8 motifs):} $SS$, $SK$, $SI$, $S(SS)$, $SII$,
+	      $SKK$, $S(KS)$ and $S(KI)$.  These have $S$ as the head combinator with
+	      varying spine arguments.
+	\item \textbf{$K$-headed (3 motifs):} $KS$, $KK$ and $KI$.  These have $K$
+	      as the head, making them constant functions that discard their second
+	      argument.
+\end{itemize}
+
+\noindent We additionally test multi-motif combinations:
+\begin{itemize}[nosep]
+	\item \textbf{4 pairs} ($k=5$ basis, sizes 1--6): $\{SS, S(SS)\}$,
+	      $\{SS, KS\}$, $\{SS, SII\}$ and $\{S(SS), SII\}$.
+	\item \textbf{2 triples} ($k=6$ basis, sizes 1--5): $\{SS, S(SS), SII\}$
+	      and $\{SS, SK, KS\}$.
+\end{itemize}
+For combinations, each motif receives its own library index ($\#0$, $\#1$,
+etc.) and the basis is extended accordingly.
+
+
+% ══════════════════════════════════════════════════════════════════
+\section{Results}
+\label{sec:results}
+
+\subsection{Baseline Survey}
+
+Table~\ref{tab:baseline} shows the baseline results for the standard SKI
+basis at sizes 1--7.
+
+\begin{table}[ht]
+	\centering
+	\caption{Baseline survey: SKI basis, sizes 1--7. $T(N)$: total terms;
+		$D(N)$: distinct normal forms; $\rho(N)$: compression ratio; Divg/Expl:
+		divergent/explosive terms; $\mu$: new motifs; $\overline{s}$: average
+		reduction steps.}
+	\label{tab:baseline}
+	\begin{tabular}{r r r r r r r r}
+		\toprule
+		$N$ & $T(N)$    & $D(N)$  & $\rho(N)$ & Divg & Expl & $\mu$   & $\overline{s}$ \\
+		\midrule
+		1   & 3         & 3       & 1.0000    & 0    & 0    & 3       & 0.00           \\
+		2   & 9         & 9       & 1.0000    & 0    & 0    & 6       & 0.33           \\
+		3   & 54        & 30      & 0.5556    & 0    & 0    & 21      & 0.72           \\
+		4   & 405       & 108     & 0.2667    & 0    & 0    & 78      & 1.19           \\
+		5   & 3{,}402   & 438     & 0.1287    & 0    & 0    & 330     & 1.69           \\
+		6   & 30{,}618  & 1{,}920 & 0.0627    & 5    & 0    & 1{,}483 & 2.22           \\
+		7   & 288{,}684 & 8{,}706 & 0.0302    & 128  & 44   & 6{,}803 & 2.75           \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsubsection{Exponential Compression Decay}
+
+The compression ratio $\rho(N)$ decays exponentially for $N \ge 3$:
+\begin{equation}
+	\rho(N) \approx e^{-0.727 \cdot N}
+	\label{eq:decay}
+\end{equation}
+with $R^2 = 1.000$ (Figure~\ref{fig:compression}).  The per-step decay
+factor is $e^{-0.727} \approx 0.483$: at each size increment, roughly half
+the ``expressive distinctness'' is lost.  The half-life is 0.95 size steps.
+
+This decay arises because the total term count grows as
+$T(N) \sim C_{N-1} \cdot 3^N$ (super-exponential in $N$), while the distinct
+normal form count grows at approximately $3.82\times$ per size increment.
+The normal form count grows fast, but not fast enough to keep up with the
+combinatorial explosion of syntactically distinct inputs.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.85\textwidth]{../plots/fig1_compression_decay.pdf}
+	\caption{Compression ratio $\rho(N)$ vs.\ term size $N$ for baseline and
+		all single-motif experiments.  Dashed lines show exponential fits.  The
+		baseline (dark) decays at $e^{-0.727N}$; the best extended basis, $S(SS)$
+		(purple), decays at $e^{-0.605N}$.}
+	\label{fig:compression}
+\end{figure}
+
+
+\subsubsection{The Transition Cascade}
+
+We observe a structured sequence of transitions in the baseline
+(Figure~\ref{fig:cascade}):
+
+\begin{enumerate}[nosep]
+	\item \textbf{Size 1--2: Trivial regime.} Every term reduces to a distinct
+	      normal form ($\rho = 1.0$).  No combinator has enough arguments to fire.
+	\item \textbf{Size 3: Compression onset.} The first non-trivial reductions
+	      occur.  $K$ begins to fire, discarding arguments: $K\;S\;K \to S$, etc.
+	      The compression ratio drops to 0.556.
+	\item \textbf{Size 4: Distribution onset.} $S$ begins to fire, distributing
+	      and duplicating.  The compression ratio drops to 0.267.
+	\item \textbf{Size 5--6: Deepening.} Inner reductions become common (reducing
+	      sub-terms that are not at the outermost spine). Average step count
+	      increases from 1.19 to 2.22.
+	\item \textbf{Size 6: Divergence onset.} Five terms fail to normalize within
+	      10{,}000 steps (0.016\% of terms).  These are the first terms that loop.
+	\item \textbf{Size 7: Explosion onset.} 44 terms grow beyond 50{,}000 atoms
+	      during reduction.  Additionally, 128 terms diverge (0.044\% and 0.015\%
+	      respectively).
+\end{enumerate}
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.85\textwidth]{../plots/fig9_cascade.pdf}
+	\caption{The transition cascade in the baseline SKI experiment.  From top:
+		compression ratio (log scale), divergent/explosive term counts, new motif
+		count (log scale) and average reduction steps.}
+	\label{fig:cascade}
+\end{figure}
+
+
+\subsubsection{Attractor Normal Forms}
+
+The distribution of normal form multiplicities (how many input terms reduce
+to each distinct normal form) follows a power law
+(Figure~\ref{fig:nfdist}):
+\begin{equation}
+	\text{multiplicity}(\text{rank}) \sim \text{rank}^{-\alpha},
+	\quad \alpha \approx 1.5
+\end{equation}
+
+The top attractors at size 7 are shown in Table~\ref{tab:attractors}.  The
+three atomic combinators ($I$, $K$, $S$) are the strongest attractors,
+collectively accounting for 19.7\% of all normalizing terms.  This is
+expected, since many terms reduce by discarding or simplifying to atoms.
+The second tier (the six size-2 normal forms $KK$, $KI$, $SI$, $SS$, $SK$,
+$KS$) have comparable multiplicities, ranging from 9{,}201 to 10{,}629.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.95\textwidth]{../plots/fig4_nf_distribution_s7.pdf}
+	\caption{Left: rank-frequency plot of NF multiplicities at size 7, showing
+		approximate power-law behavior ($\alpha \approx 1.5$).  Right: the 15 most
+		common normal forms.}
+	\label{fig:nfdist}
+\end{figure}
+
+\begin{table}[ht]
+	\centering
+	\caption{Top 15 attractor normal forms in the baseline at size 7.
+		Multiplicity is the number of distinct size-7 input terms that reduce to
+		this normal form.}
+	\label{tab:attractors}
+	\begin{tabular}{l r r}
+		\toprule
+		Normal Form    & Multiplicity & \% of normalizing \\
+		\midrule
+		\texttt{I}     & 19{,}864     & 6.9\%             \\
+		\texttt{K}     & 18{,}880     & 6.5\%             \\
+		\texttt{S}     & 18{,}171     & 6.3\%             \\
+		\texttt{KK}    & 10{,}629     & 3.7\%             \\
+		\texttt{KI}    & 10{,}177     & 3.5\%             \\
+		\texttt{SI}    & 10{,}105     & 3.5\%             \\
+		\texttt{SS}    & 10{,}000     & 3.5\%             \\
+		\texttt{SK}    & 9{,}785      & 3.4\%             \\
+		\texttt{KS}    & 9{,}201      & 3.2\%             \\
+		\texttt{SII}   & 3{,}658      & 1.3\%             \\
+		\texttt{K(KK)} & 3{,}459      & 1.2\%             \\
+		\texttt{S(SS)} & 3{,}317      & 1.1\%             \\
+		\texttt{SSS}   & 3{,}267      & 1.1\%             \\
+		\texttt{SKK}   & 3{,}197      & 1.1\%             \\
+		\texttt{K(SK)} & 3{,}124      & 1.1\%             \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+
+\subsubsection{Motif Reuse Value}
+
+The top motifs by reuse savings at each size are dominated by S-headed
+sub-expressions (Figure~\ref{fig:motifs}).  At size 7, the top three motifs
+are $SS$, $SI$ and $SK$, each appearing in over 3{,}100 distinct normal
+forms.  The reuse savings grow rapidly with size (from 1 at size 2 to over
+4{,}000 at size~7), indicating that the payoff of naming a sub-expression
+increases as the system grows.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.85\textwidth]{../plots/fig5_motif_reuse.pdf}
+	\caption{Top 5 motif reuse savings by term size in the baseline experiment.
+		$SS$, $SI$ and $SK$ consistently dominate.}
+	\label{fig:motifs}
+\end{figure}
+
+
+\subsection{The Naming Experiment: Single-Motif Results}
+
+Table~\ref{tab:crossmotif} shows the results at size 6 for all 11 single
+motifs, ranked by compression advantage.
+
+\begin{table}[ht]
+	\centering
+	\caption{All 11 single motifs at $N=6$, ranked by compression advantage
+		$\rho_{\text{ext}}/\rho_{\text{base}}$.  Head: head combinator of the
+		motif.}
+	\label{tab:crossmotif}
+	\begin{tabular}{l l r r r r r}
+		\toprule
+		Motif          & Head & $D(6)$   & $\rho(6)$ & Advantage     & Divg\% & Expl\% \\
+		\midrule
+		Baseline (SKI) & --   & 1{,}920  & 0.0627    & $1.000\times$ & 0.0\%  & 0.0\%  \\
+		\midrule
+		$S(SS)$        & $S$  & 18{,}174 & 0.1056    & $1.685\times$ & 1.8\%  & 6.8\%  \\
+		$SS$           & $S$  & 17{,}346 & 0.1008    & $1.608\times$ & 0.4\%  & 1.1\%  \\
+		$SI$           & $S$  & 10{,}697 & 0.0622    & $0.992\times$ & 1.1\%  & 1.8\%  \\
+		$S(KS)$        & $S$  & 9{,}728  & 0.0565    & $0.902\times$ & 0.0\%  & 0.0\%  \\
+		$S(KI)$        & $S$  & 9{,}294  & 0.0540    & $0.862\times$ & 0.0\%  & 0.0\%  \\
+		$SK$           & $S$  & 9{,}284  & 0.0540    & $0.861\times$ & 0.0\%  & 0.0\%  \\
+		$SII$          & $S$  & 4{,}703  & 0.0273    & $0.436\times$ & 16.7\% & 0.6\%  \\
+		$SKK$          & $S$  & 3{,}642  & 0.0212    & $0.338\times$ & 0.0\%  & 0.0\%  \\
+		$KS$           & $K$  & 3{,}636  & 0.0211    & $0.337\times$ & 0.0\%  & 0.0\%  \\
+		$KK$           & $K$  & 3{,}636  & 0.0211    & $0.337\times$ & 0.0\%  & 0.0\%  \\
+		$KI$           & $K$  & 3{,}636  & 0.0211    & $0.337\times$ & 0.0\%  & 0.0\%  \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.95\textwidth]{../plots/fig6_motif_comparison.pdf}
+	\caption{Left: compression ratio by size for all single-motif experiments.
+		Right: compression advantage ($\rho_{\text{ext}}/\rho_{\text{base}}$)
+		vs.\ size. Values above 1.0 indicate the extended basis produces more
+		distinct normal forms per input term.}
+	\label{fig:comparison}
+\end{figure}
+
+The 11 motifs separate into four groups
+(Figure~\ref{fig:comparison}, Table~\ref{tab:crossmotif}):
+
+\paragraph{Winners ($>1.0\times$): $S(SS)$ and $SS$.}
+These two motifs slow compression decay substantially.  $S(SS)$ achieves
+the highest advantage ($1.685\times$) with a decay rate of $e^{-0.605N}$
+compared to the baseline's $e^{-0.727N}$.  $SS$ is close behind at
+$1.608\times$ with decay rate $e^{-0.608N}$.  Both are size-2 or size-3
+terms whose spine arguments consist entirely of $S$ combinators.
+
+\paragraph{Neutral ($\approx 1.0\times$): $SI$.}
+$SI$ produces $0.992\times$ advantage, essentially matching the baseline.
+It introduces moderate non-normalization (2.9\%) without compensating
+expressiveness gain.
+
+\paragraph{Mild losers ($0.86$--$0.90\times$): $S(KS)$, $S(KI)$, $SK$.}
+These $S$-headed motifs produce advantages below~$1.0$ but remain
+significantly above the bottom tier.  They have $K$ in their spine or as
+their immediate argument, which partially neutralizes the distributing
+effect of $S$.  None introduce divergence at size~6.
+
+\paragraph{Strong losers ($<0.44\times$): $SII$, $SKK$, $KS$, $KK$, $KI$.}
+These five motifs all produce compression advantages below $0.44\times$.
+The three $K$-headed motifs ($KS$, $KK$, $KI$) are identically harmful:
+they produce exactly the same 3{,}636 distinct normal forms and the same
+compression ratio 0.0211 at every size.  This is because $Kx$ for any $x$
+is a constant function ($Kx\;y \to x$), so $KS$, $KK$ and $KI$ are
+interchangeable as basis extensions.
+
+$SKK$ is equally harmful despite being $S$-headed.  It computes the
+identity function ($SKK\;x \to x$), which is already available as $I$ in
+the basis, so naming it is strictly redundant.
+
+$SII$ is the most instructive case.  As the self-application combinator
+($SII\;x \to xx$), it is the building block of the diverger
+$\Omega = SII\;(SII)$.  It is $S$-headed and introduces genuinely new
+computational behavior (self-application), yet its compression advantage is
+only $0.436\times$.  The reason is clear from the data: 17.3\% of terms at
+size~6 fail to normalize (16.7\% divergent, 0.6\% explosive).  The
+non-normalization rate overwhelms any expressiveness gain.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.85\textwidth]{../plots/fig8_motif_ranking.pdf}
+	\caption{All 11 single motifs ranked by compression advantage at $N=6$.
+		Red bars: $S$-headed motifs.  Blue bars: $K$-headed motifs.}
+	\label{fig:ranking}
+\end{figure}
+
+
+\subsubsection{Motif Classification}
+
+Figure~\ref{fig:classification} plots each motif's compression advantage
+against its non-normalizing rate, revealing a structured landscape:
+
+\begin{enumerate}[nosep]
+	\item \textbf{Head combinator determines the floor.}  Every $K$-headed
+	      motif achieves advantage $\le 0.337\times$.  No $K$-headed motif
+	      produces more than 3{,}636 distinct normal forms at size~6.  The head
+	      combinator is the single strongest predictor of compression advantage.
+	\item \textbf{Spine content determines the ceiling (for $S$-headed motifs).}
+	      Among $S$-headed motifs, those with $S$ in the spine ($SS$, $S(SS)$)
+	      achieve advantage $> 1.6\times$, while those with $K$ in the spine
+	      ($SK$, $S(KS)$, $S(KI)$, $SKK$) achieve $< 0.91\times$.
+	\item \textbf{Self-application is costly.}  $SII$ introduces the highest
+	      non-normalization rate (17.3\%) and falls well below the other $S$-headed
+	      motifs despite being $S$-headed with no $K$ in its spine.
+\end{enumerate}
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../plots/fig10_classification.pdf}
+	\caption{Motif classification scatter: compression advantage vs.\
+		non-normalizing rate at $N=6$.  Red: $S$-headed motifs.  Blue: $K$-headed.
+		Circles: size-2 motifs.  Triangles: size-3.}
+	\label{fig:classification}
+\end{figure}
+
+
+\subsubsection{K-Headed Equivalence and the SKK Coincidence}
+
+A striking feature of the data is the exact equivalence of the three
+$K$-headed motifs.  At every size from 1 to 6, the experiments $KS$, $KK$
+and $KI$ produce identical distinct NF counts (e.g.\ 3{,}636 at size~6)
+and identical compression ratios.  This is not an artifact: since
+$Kx\;y \to x$ for any $x$, the term $Kx$ with one remaining argument is a
+constant function returning $x$.  Adding $KS$, $KK$ or $KI$ as a basis
+element adds a one-argument function that always returns $S$, $K$ or $I$
+respectively.  These are structurally equivalent as basis extensions: each
+adds a single constant to the reachable computations.
+
+Similarly, $SKK$ produces compression behavior nearly identical to the
+$K$-headed motifs (decay rate $-0.900$ vs.\ $-0.900$) because $SKK$
+computes the identity, duplicating the role of $I$.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../plots/fig12_taxonomy.pdf}
+	\caption{Motif taxonomy heatmap: all 11 single motifs (rows) across 4
+		metrics (columns).  Red sidebar indicates $S$-headed; blue indicates
+		$K$-headed.}
+	\label{fig:taxonomy}
+\end{figure}
+
+
+\subsection{The Divergence--Expressiveness Correlation}
+
+The most expressive motifs also introduce the most divergence and explosion.
+The full data at size~6:
+
+\begin{itemize}[nosep]
+	\item $S(SS)$: 1.8\% divergent + 6.8\% explosive = 8.6\% non-normalizing, advantage $1.685\times$
+	\item $SS$: 0.4\% + 1.1\% = 1.5\%, advantage $1.608\times$
+	\item $SI$: 1.1\% + 1.8\% = 2.9\%, advantage $0.992\times$
+	\item $SII$: 16.7\% + 0.6\% = 17.3\%, advantage $0.436\times$
+	\item $SK$, $S(KS)$, $S(KI)$, $SKK$: 0.0\%, advantage $0.86$--$0.90\times$
+	\item $KS$, $KK$, $KI$: 0.0\%, advantage $0.337\times$
+\end{itemize}
+
+The motifs with zero non-normalization are exactly those that provide no
+compression advantage or are actively harmful.  This confirms a basic
+property of Turing-complete systems: extending the basis with combinators
+that increase computational reach necessarily introduces the possibility of
+non-termination.  The converse does not hold uniformly, however: $SII$
+introduces the most non-termination but is not the most expressive.  High
+non-normalization is necessary but not sufficient for high compression
+advantage.
+
+
+\subsection{Combination Experiments}
+\label{sec:combos}
+
+To test whether motif benefits compound, we run 6 combination experiments:
+4 pairs at $k=5$ (size 6) and 2 triples at $k=6$ (size 5).
+Table~\ref{tab:combos} shows the results.
+
+\begin{table}[ht]
+	\centering
+	\caption{Combination experiment results.  Expected advantage is the product
+		of individual motif advantages (independence assumption).  Ratio is
+		actual/expected.}
+	\label{tab:combos}
+	\begin{tabular}{l r r r r r r r}
+		\toprule
+		Combination          & $N$ & $k$ & $D(N)$   & $\rho(N)$ & Adv.          & Exp.          & Ratio \\
+		\midrule
+		$\{SS, S(SS)\}$      & 6   & 5   & 80{,}252 & 0.1223    & $1.950\times$ & $2.710\times$ & 0.72  \\
+		$\{SS, KS\}$         & 6   & 5   & 26{,}990 & 0.0411    & $0.656\times$ & $0.542\times$ & 1.21  \\
+		$\{SS, SII\}$        & 6   & 5   & 29{,}291 & 0.0446    & $0.712\times$ & $0.701\times$ & 1.02  \\
+		$\{S(SS), SII\}$     & 6   & 5   & 29{,}258 & 0.0446    & $0.711\times$ & $0.734\times$ & 0.97  \\
+		\midrule
+		$\{SS, S(SS), SII\}$ & 5   & 6   & 12{,}932 & 0.1188    & $0.923\times$ & $1.147\times$ & 0.80  \\
+		$\{SS, SK, KS\}$     & 5   & 6   & 9{,}498  & 0.0872    & $0.678\times$ & $0.546\times$ & 1.24  \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../plots/fig11_combo_interactions.pdf}
+	\caption{Combination interaction effects.  Each point is a multi-motif
+		experiment; $x$-axis shows the expected advantage (product of individual
+		motif advantages), $y$-axis shows the actual measured advantage.  Points
+		above the diagonal indicate super-multiplicative interaction; below
+		indicates sub-multiplicative.}
+	\label{fig:interactions}
+\end{figure}
+
+Three patterns emerge from the combination data:
+
+\paragraph{The best pair is sub-multiplicative.}
+$\{SS, S(SS)\}$ achieves $1.950\times$ advantage, the highest of any
+experiment.  However, the product of the individual advantages is
+$1.608 \times 1.685 = 2.710$, so the combination achieves only 72\% of
+the expected value.  Both motifs expand the same region of computational
+space (S-distributing with S-rich spines), producing diminishing returns
+when combined.
+
+\paragraph{Harmful motifs are less harmful than expected when paired with
+	strong motifs.}
+$\{SS, KS\}$ achieves $0.656\times$ advantage, which is 1.21 times the
+expected product ($0.542\times$).  Similarly, $\{SS, SK, KS\}$ achieves
+$0.678\times$ vs.\ an expected $0.546\times$ (ratio 1.24).  The strong
+motif ($SS$) partially compensates for the weak ones.
+
+\paragraph{SII drags down any combination.}
+All three combinations involving $SII$ underperform: $\{SS, SII\}$ at
+$0.712\times$, $\{S(SS), SII\}$ at $0.711\times$ and $\{SS, S(SS), SII\}$
+at $0.923\times$.  The non-normalization rate of $SII$ propagates through
+the combination: $\{SS, SII\}$ has 18.8\% non-normalizing terms and
+$\{S(SS), SII\}$ has 27.4\%.
+
+
+% ══════════════════════════════════════════════════════════════════
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Compression Decay is Universal but Rate-Variable}
+
+Every experiment in our study exhibits exponential compression decay with
+$R^2 \ge 0.996$.  The decay rate, however, varies substantially: from
+$-0.572$ for the best combination ($\{SS, S(SS)\}$) to $-0.900$ for the
+worst single motifs ($KS$, $KK$, $KI$, $SKK$).  The baseline sits at
+$-0.727$.  This suggests that exponential compression decay is a structural
+property of CL enumeration (driven by the super-exponential growth of the
+input space), while the specific rate is determined by the basis.
+
+A natural question is whether the decay rate has a lower bound.  Our data
+show diminishing returns: $S(SS)$ achieves $-0.605$, the combination
+$\{SS, S(SS)\}$ achieves $-0.572$, and the triple $\{SS, S(SS), SII\}$
+achieves $-0.653$ (worse than the pair, due to $SII$'s divergence cost).
+Whether iterating the naming process can push the decay rate arbitrarily
+close to zero, or whether there is a fundamental floor, remains open.
+
+
+\subsection{What Determines the Value of a Basis Extension}
+
+Comparing all 11 single motifs reveals that three properties predict whether
+naming a motif improves or harms compression:
+
+\begin{enumerate}[nosep]
+	\item \textbf{Spine content (strongest predictor).}  Among $S$-headed
+	      motifs, those whose spine consists entirely of $S$ combinators ($SS$,
+	      $S(SS)$) are the only ones with advantage $> 1.0$.  Introducing $K$ into
+	      the spine ($SK$, $S(KS)$, $S(KI)$, $SKK$) drops the advantage to
+	      $0.34$--$0.90\times$.  The spine determines what the $S$ combinator
+	      distributes when it fires: $S$-rich spines distribute further combinatorial
+	      structure, while $K$-rich spines distribute discarders.
+	\item \textbf{Head combinator (floor predictor).}  All $K$-headed motifs
+	      ($KS$, $KK$, $KI$) produce advantages $\le 0.337\times$.  The head
+	      combinator sets a hard floor on expressiveness because $K$ discards its
+	      second argument, collapsing the space of reachable outputs.
+	\item \textbf{Non-normalization rate (ceiling predictor).}  $SII$
+	      demonstrates that even a motif with favorable structural properties
+	      ($S$-headed, no $K$ in spine) can fail if it causes too many terms to
+	      diverge.  Its 17.3\% non-normalization rate at size~6 overwhelms the
+	      computational reach it provides.
+\end{enumerate}
+
+This yields a practical test for motif selection: a good basis extension is
+one whose head combinator is $S$, whose spine arguments are $S$-rich and
+whose effective arity does not create excessive self-application.
+
+
+\subsection{Scaling Effects Across Naming Experiments}
+
+The compression advantage of the best motifs ($SS$, $S(SS)$) grows with
+term size: at size 3, both are near $1.1\times$; by size 6, they reach
+$1.6$--$1.7\times$ (Figure~\ref{fig:comparison}, right panel).  This
+growth means that the benefit of having named a useful sub-expression
+\emph{compounds as the system scales}.  Each additional unit of syntactic
+complexity produces more distinct outputs in the extended basis than in the
+standard basis, and this gap widens at larger sizes.
+
+The combination $\{SS, S(SS)\}$ extends this further, reaching
+$1.95\times$ at size~6.  However, the sub-multiplicative interaction
+(72\% of expected) suggests that the two motifs overlap in the computational
+territory they open up.  A combination of motifs that expand orthogonal
+regions of the computation space might achieve closer to multiplicative
+gains.
+
+
+\subsection{Connection to Logical Depth}
+
+The average reduction steps $\overline{s}(N)$ increase monotonically, from
+0 at size 1 to 2.75 at size 7 in the baseline.  However, the maximum steps
+$s_{\max}$ reveal more: $s_{\max}(7) = 23$ in the baseline, but
+$s_{\max}(6) = 9{,}174$ for $S(SS)$ and $s_{\max}(6) = 2{,}292$ for $SS$.
+These are terms that undergo long chains of rewriting before settling into a
+normal form.  In Bennett's terminology \citep{bennett1988}, they have high
+logical depth: they are ``computationally deep'' outputs that require
+significant work to derive.
+
+The extended bases amplify logical depth because the named motifs create
+more opportunities for $S$ to fire, leading to longer reduction chains.
+This is another aspect of the divergence--expressiveness correlation: more
+computational reach means more computation happens, producing both more
+distinct normal forms and more non-termination.
+
+
+\subsection{Limitations}
+
+\begin{enumerate}[nosep]
+	\item \textbf{Size ceiling.} Our exhaustive enumeration reaches size 7 for
+	      the baseline (288{,}684 terms), size 6 for single-motif and pair
+	      experiments and size 5 for triple combinations.  Larger sizes would
+	      strengthen the exponential decay fits and might reveal higher-order
+	      transitions.
+	\item \textbf{Fuel sensitivity.} Terms classified as ``divergent'' might
+	      eventually normalize with a higher fuel limit.  Our fuel of 10{,}000
+	      is generous relative to the baseline (max normalizing steps = 23) but
+	      the extended bases push this much higher (up to 9{,}174 for $S(SS)$),
+	      suggesting the classification boundary may shift at larger sizes.
+	\item \textbf{Basis size confound.} The combination experiments increase
+	      the basis size $k$, which independently increases the enumeration space.
+	      A $k=5$ experiment at size 6 enumerates $3.8\times$ more terms than
+	      $k=4$.  The compression ratio already accounts for this (it divides by
+	      total terms), but it means the ``search space'' interpretation differs
+	      across experiments.
+	\item \textbf{Syntactic identity only.} We identify normal forms by
+	      syntactic equality.  A richer analysis would classify them by
+	      computational behavior (e.g.\ identifying which normal forms act as
+	      projections, composition operators, etc.), which might reveal structure
+	      not visible in our metrics.
+\end{enumerate}
+
+
+% ══════════════════════════════════════════════════════════════════
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have conducted an exhaustive empirical study of compression and
+structural emergence in combinatory logic, testing 11 individual motifs and
+6 multi-motif combinations as basis extensions.  Our main findings are:
+
+\begin{enumerate}
+	\item \textbf{Exponential compression decay.}  The compression ratio
+	      $\rho(N)$ decays as $e^{-0.727N}$ in the SKI basis ($R^2 = 1.000$),
+	      meaning the fraction of input terms producing unique normal forms roughly
+	      halves with every size increment.
+
+	\item \textbf{A structured cascade.}  The transition from trivial to complex
+	      behavior is not a single event but a cascade: discarding ($N=3$)
+	      $\to$ distribution ($N=4$) $\to$ inner reduction ($N=5$) $\to$
+	      divergence ($N=6$) $\to$ explosion ($N=7$).
+
+	\item \textbf{Basis extension can slow or accelerate decay.}  Of 11 motifs
+	      tested, 2 slow compression decay (best: $S(SS)$ at $1.68\times$
+	      advantage), 1 is neutral and 8 accelerate it (worst: $KS$/$KK$/$KI$ at
+	      $0.34\times$).  The benefit of the two best motifs grows with system
+	      size, reaching $1.6$--$1.7\times$ at size~6.
+
+	\item \textbf{Spine content predicts motif value.}  Among $S$-headed motifs,
+	      those with $S$-only spines ($SS$, $S(SS)$) are the only winners.
+	      Introducing $K$ into the spine drops the advantage below $1.0$.  All
+	      $K$-headed motifs produce identical, harmful results.
+
+	\item \textbf{Non-normalization constrains expressiveness.}  $SII$, the
+	      self-application combinator, is $S$-headed with no $K$ in its spine yet
+	      achieves only $0.44\times$ advantage due to 17.3\% non-normalization.
+	      High non-normalization is a necessary accompaniment of the best motifs
+	      ($S(SS)$: 8.6\%, $SS$: 1.5\%) but $SII$ shows it can also dominate.
+
+	\item \textbf{Combination effects are sub-multiplicative for strong pairs.}
+	      The best pair $\{SS, S(SS)\}$ achieves $1.95\times$ (72\% of the
+	      expected product).  Harmful motifs are less harmful than expected when
+	      paired with strong motifs (super-multiplicative ratios of 1.21--1.24).
+\end{enumerate}
+
+
+\subsection{Future Work}
+
+Several directions follow naturally:
+
+\begin{itemize}[nosep]
+	\item \textbf{Iterative naming.}  Run the naming experiment in a loop: add
+	      the best motif, re-survey, add the next best motif.  Does the
+	      compression advantage compound indefinitely, or is there a fixed point?
+	\item \textbf{Optimal motif selection.}  The spine-content predictor
+	      established here could be tested as a heuristic for selecting motifs
+	      without exhaustive evaluation.
+	\item \textbf{Larger sizes.}  Extend to size 8+ using sampling rather than
+	      exhaustive enumeration to test whether the exponential decay rates and
+	      the motif ranking remain stable.
+	\item \textbf{Semantic classification.}  Classify normal forms by
+	      computational behavior rather than syntactic identity.  For instance,
+	      identifying which normal forms are projections ($\lambda xy.x$,
+	      $\lambda xy.y$), which are composition operators, etc.
+	\item \textbf{Comparison to library learning.}  The bottom-up motif
+	      evaluation performed here is complementary to DreamCoder's top-down,
+	      neural-guided library learning \citep{ellis2021}.  A direct comparison
+	      on shared benchmarks would clarify the relative strengths of exhaustive
+	      vs.\ heuristic approaches.
+\end{itemize}
+
+
+% ══════════════════════════════════════════════════════════════════
+\bibliographystyle{plainnat}
+
+\begin{thebibliography}{10}
+
+	\bibitem[Bennett(1988)]{bennett1988}
+	C.~H. Bennett.
+	\newblock Logical depth and physical complexity.
+	\newblock In R.~Herken, editor, \emph{The Universal Turing Machine: A
+		Half-Century Survey}, pages 227--257. Oxford University Press, 1988.
+
+	\bibitem[Ellis et~al.(2021)]{ellis2021}
+	K.~Ellis, C.~Wong, M.~Nye, M.~Sable-Meyer, L.~Morales, L.~Hewitt,
+	L.~Cary, A.~Solar-Lezama, and J.~B. Tenenbaum.
+	\newblock {DreamCoder}: building libraries of compositional abstractions.
+	\newblock \emph{Proceedings of the ACM SIGPLAN Conference on Programming
+		Language Design and Implementation (PLDI)}, 2021.
+
+	\bibitem[Hindley and Seldin(2008)]{hindley2008}
+	J.~R. Hindley and J.~P. Seldin.
+	\newblock \emph{Lambda-Calculus and Combinators: An Introduction}.
+	\newblock Cambridge University Press, 2nd edition, 2008.
+
+	\bibitem[Li and Vit\'{a}nyi(2019)]{li2019}
+	M.~Li and P.~Vit\'{a}nyi.
+	\newblock \emph{An Introduction to Kolmogorov Complexity and Its Applications}.
+	\newblock Springer, 4th edition, 2019.
+
+	\bibitem[M\'{e}zard and Montanari(2009)]{mezard2009}
+	M.~M\'{e}zard and A.~Montanari.
+	\newblock \emph{Information, Physics, and Computation}.
+	\newblock Oxford University Press, 2009.
+
+	\bibitem[Tromp(2014)]{tromp2014}
+	J.~Tromp.
+	\newblock Binary lambda calculus and combinatory logic.
+	\newblock In C.~Calude, editor, \emph{Randomness and Complexity, from Leibniz
+		to Chaitin}, pages 237--260. World Scientific, 2014.
+
+\end{thebibliography}
+
+
+% ══════════════════════════════════════════════════════════════════
+\appendix
+\section{Reduction Step Distribution}
+\label{app:steps}
+
+Figure~\ref{fig:steps} shows the distribution of reduction steps for
+normalizing terms at size 7 in the baseline.  The distribution is
+concentrated at low step counts (mean $\overline{s} = 2.75$, max $= 23$),
+indicating that most terms normalize quickly.  The right tail consists of
+terms requiring chains of $S$-reductions.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8\textwidth]{../plots/fig7_steps_s7.pdf}
+	\caption{Distribution of reduction steps for normalizing terms at size 7
+		(baseline).}
+	\label{fig:steps}
+\end{figure}
+
+
+\section{Full Exponential Decay Fits}
+\label{app:fits}
+
+Table~\ref{tab:fits} shows the exponential decay parameters for all
+single-motif experiments.  Note the exact equivalence of $KS$, $KK$, $KI$
+and the near-equivalence of $SKK$; and the exact equivalence of $SK$ and
+$S(KI)$.
+
+\begin{table}[ht]
+	\centering
+	\caption{Exponential decay parameters $\rho(N) \approx A \cdot e^{bN}$ for
+		each single-motif experiment.  Experiments are grouped by decay rate.}
+	\label{tab:fits}
+	\begin{tabular}{l r r r}
+		\toprule
+		Experiment     & Decay rate $b$ & Per-step factor $e^b$ & $R^2$ \\
+		\midrule
+		SKI + $S(SS)$  & $-0.605$       & 0.546                 & 0.999 \\
+		SKI + $SS$     & $-0.608$       & 0.544                 & 1.000 \\
+		\midrule
+		SKI + $SI$     & $-0.715$       & 0.489                 & 1.000 \\
+		Baseline (SKI) & $-0.727$       & 0.483                 & 1.000 \\
+		SKI + $S(KS)$  & $-0.747$       & 0.474                 & 1.000 \\
+		SKI + $SK$     & $-0.762$       & 0.467                 & 1.000 \\
+		SKI + $S(KI)$  & $-0.762$       & 0.467                 & 1.000 \\
+		\midrule
+		SKI + $SII$    & $-0.837$       & 0.433                 & 0.998 \\
+		\midrule
+		SKI + $KS$     & $-0.900$       & 0.407                 & 0.999 \\
+		SKI + $KK$     & $-0.900$       & 0.407                 & 0.999 \\
+		SKI + $KI$     & $-0.900$       & 0.407                 & 0.999 \\
+		SKI + $SKK$    & $-0.900$       & 0.407                 & 0.999 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+
+\section{Combination Experiment Decay Rates}
+\label{app:combo_fits}
+
+\begin{table}[ht]
+	\centering
+	\caption{Exponential decay parameters for combination experiments.}
+	\label{tab:combo_fits}
+	\begin{tabular}{l r r r}
+		\toprule
+		Experiment           & Decay rate $b$ & Per-step factor $e^b$ & $R^2$ \\
+		\midrule
+		$\{SS, S(SS)\}$      & $-0.572$       & 0.564                 & 0.999 \\
+		$\{SS, S(SS), SII\}$ & $-0.653$       & 0.521                 & 0.996 \\
+		$\{SS, SII\}$        & $-0.727$       & 0.483                 & 0.998 \\
+		$\{S(SS), SII\}$     & $-0.729$       & 0.482                 & 0.997 \\
+		$\{SS, KS\}$         & $-0.748$       & 0.473                 & 0.999 \\
+		$\{SS, SK, KS\}$     & $-0.756$       & 0.470                 & 0.998 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+
+\end{document}
