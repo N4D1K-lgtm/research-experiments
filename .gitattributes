@@ -1,0 +1,2 @@
+projects/02-ipa-trie-visualization/data/*.txt filter=lfs diff=lfs merge=lfs -text
+projects/02-ipa-trie-visualization/data/ipa.db/** filter=lfs diff=lfs merge=lfs -text

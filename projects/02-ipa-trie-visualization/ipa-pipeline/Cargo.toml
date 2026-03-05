@@ -1,0 +1,51 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ipa-core",
+    "crates/ipa-ingest",
+    "crates/ipa-db",
+    "crates/ipa-trie",
+    "crates/ipa-export",
+    "crates/ipa-server",
+]
+
+[package]
+name = "ipa-pipeline"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "ipa-pipeline"
+path = "src/main.rs"
+
+[dependencies]
+ipa-core = { path = "crates/ipa-core" }
+ipa-ingest = { path = "crates/ipa-ingest" }
+ipa-db = { path = "crates/ipa-db" }
+ipa-trie = { path = "crates/ipa-trie" }
+ipa-export = { path = "crates/ipa-export" }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+indicatif = "0.17"
+
+[workspace.dependencies]
+surrealdb = { version = "3", features = ["kv-rocksdb"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", features = ["rustls-tls"] }
+unicode-normalization = "0.1"
+unicode-segmentation = "1"
+csv = "1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+indicatif = "0.17"
+sha2 = "0.10"
+tempfile = "3"

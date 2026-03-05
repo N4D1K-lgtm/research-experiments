@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "surrealdb": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--network", "host",
+        "surrealdb/surrealmcp:latest",
+        "start"
+      ],
+      "env": {
+        "SURREALDB_URL": "ws://127.0.0.1:8000/rpc",
+        "SURREALDB_NS": "ipa",
+        "SURREALDB_DB": "pipeline",
+        "SURREALDB_USER": "root",
+        "SURREALDB_PASS": "root"
+      }
+    }
+  }
+}

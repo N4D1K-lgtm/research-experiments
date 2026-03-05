@@ -14,6 +14,12 @@ The experiment is: take the sub-expressions that keep appearing in those structu
 
 [src](https://github.com/N4D1K-lgtm/research-experiments/tree/main/projects/01-naming-in-combinatory-logic/src) / [paper (pdf)]({{ site.baseurl }}/assets/posts/01/paper.pdf)
 
+## 02: IPA Trie Visualization
+
+3D visualization of a phonological trie built from IPA dictionary data across five languages (English, French, Spanish, German, Dutch). Each node represents an IPA speech sound; colors blend by language family using circular HSL means. Romance languages (French, Spanish) pull toward red, Germanic languages (German, Dutch) pull toward yellow, and English — sitting between both families — appears orange. Nodes shared by all languages reveal the common phonological backbone.
+
+[src](https://github.com/N4D1K-lgtm/research-experiments/tree/main/projects/02-ipa-trie-visualization)
+
 ---
 
 ## Other Directions

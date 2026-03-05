@@ -8,6 +8,10 @@ Experiments on formal systems and related topics.
 
 Exhaustive enumeration of combinatory logic terms up to size 7. Measuring what happens to the compression ratio when you name frequent sub-expressions and add them as new primitives.
 
+### [02: IPA Trie Visualization](projects/02-ipa-trie-visualization/)
+
+3D visualization of a phonological trie across five languages (English, French, Spanish, German, Dutch). Colors blend by language family using circular HSL means, revealing shared phonological structure through Three.js.
+
 ## Structure
 
 ```

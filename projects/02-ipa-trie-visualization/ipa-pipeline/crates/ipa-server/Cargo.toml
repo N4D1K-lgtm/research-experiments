@@ -1,0 +1,24 @@
+[package]
+name = "ipa-server"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "ipa-server"
+path = "src/main.rs"
+
+[dependencies]
+ipa-core = { path = "../ipa-core" }
+ipa-db = { path = "../ipa-db" }
+ipa-trie = { path = "../ipa-trie" }
+axum = "0.8"
+async-graphql = "7"
+async-graphql-axum = "7"
+tower-http = { version = "0.6", features = ["cors"] }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }

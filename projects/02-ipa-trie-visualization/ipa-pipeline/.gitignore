@@ -1,0 +1,6 @@
+/target
+/data/wikipron/
+/data/cmu/
+/data/phoible/
+/data/*.db
+*.db

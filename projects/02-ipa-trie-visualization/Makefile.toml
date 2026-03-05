@@ -1,0 +1,228 @@
+[config]
+default_to_workspace = false
+
+[env]
+DATA_DIR = "ipa-pipeline/data"
+DB_PATH = "ipa-pipeline/data/ipa.db"
+OUTPUT_DIR = "output"
+PIPELINE_DIR = "ipa-pipeline"
+WEB_DIR = "web"
+FRONTEND_DIR = "frontend"
+SERVER_PORT = "3001"
+MIN_COUNT = "2"
+MAX_DEPTH = "6"
+LANG = "all"
+
+# ─── Data Download ────────────────────────────────────────────────────────────
+
+[tasks.download-legacy]
+description = "Download IPA dict data (legacy Python script)"
+command = "python3"
+args = ["scripts/download_data.py", "--data-dir", "${DATA_DIR}"]
+
+[tasks.download]
+description = "Download all data sources (WikiPron, CMU Dict, PHOIBLE)"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "download", "--data-dir", "${DATA_DIR}", "--lang", "${LANG}"]
+
+[tasks.download-wikipron]
+description = "Download WikiPron data only"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "download", "--data-dir", "${DATA_DIR}", "--source", "wikipron", "--lang", "${LANG}"]
+
+[tasks.download-cmu]
+description = "Download CMU Dict only"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "download", "--data-dir", "${DATA_DIR}", "--source", "cmu"]
+
+[tasks.download-phoible]
+description = "Download PHOIBLE inventory data"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "download", "--data-dir", "${DATA_DIR}", "--source", "phoible"]
+
+# ─── Ingest ───────────────────────────────────────────────────────────────────
+
+[tasks.ingest]
+description = "Ingest downloaded data into SurrealDB"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "ingest", "--data-dir", "${DATA_DIR}", "--db-path", "${DB_PATH}", "--lang", "${LANG}"]
+
+[tasks.ingest-validate]
+description = "Ingest with PHOIBLE validation"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "ingest", "--data-dir", "${DATA_DIR}", "--db-path", "${DB_PATH}", "--lang", "${LANG}", "--validate"]
+
+# ─── Build ────────────────────────────────────────────────────────────────────
+
+[tasks.build-trie]
+description = "Build trie structures from ingested data"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "build", "--db-path", "${DB_PATH}", "--lang", "${LANG}", "--min-count", "${MIN_COUNT}"]
+
+# ─── Analysis ─────────────────────────────────────────────────────────────────
+
+[tasks.analyze]
+description = "Run all analyses (entropy, motifs, cross-linguistic)"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "analyze", "--db-path", "${DB_PATH}", "--entropy", "--motifs", "--cross-linguistic"]
+
+[tasks.analyze-entropy]
+description = "Compute entropy statistics"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "analyze", "--db-path", "${DB_PATH}", "--entropy"]
+
+[tasks.analyze-motifs]
+description = "Detect phonological motifs"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "analyze", "--db-path", "${DB_PATH}", "--motifs"]
+
+[tasks.analyze-cross]
+description = "Run cross-linguistic comparison"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "analyze", "--db-path", "${DB_PATH}", "--cross-linguistic"]
+
+# ─── Export ───────────────────────────────────────────────────────────────────
+
+[tasks.export]
+description = "Export all formats (trie, essay, stats) to JSON"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "export", "--db-path", "${DB_PATH}", "--output", "${OUTPUT_DIR}", "--lang", "${LANG}", "--min-count", "${MIN_COUNT}", "--max-depth", "${MAX_DEPTH}"]
+
+[tasks.export-trie]
+description = "Export trie JSON only"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "export", "--db-path", "${DB_PATH}", "--output", "${OUTPUT_DIR}", "--format", "trie", "--lang", "${LANG}", "--min-count", "${MIN_COUNT}"]
+
+[tasks.export-essay]
+description = "Export essay data JSON"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "export", "--db-path", "${DB_PATH}", "--output", "${OUTPUT_DIR}", "--format", "essay", "--lang", "${LANG}", "--max-depth", "${MAX_DEPTH}"]
+
+[tasks.export-stats]
+description = "Export cross-linguistic stats JSON"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "export", "--db-path", "${DB_PATH}", "--output", "${OUTPUT_DIR}", "--format", "stats", "--lang", "${LANG}"]
+
+# ─── Validate ─────────────────────────────────────────────────────────────────
+
+[tasks.validate]
+description = "Validate ingested data against PHOIBLE inventories"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "validate", "--data-dir", "${DATA_DIR}", "--db-path", "${DB_PATH}", "--lang", "${LANG}"]
+
+[tasks.validate-report]
+description = "Validate with detailed report of unknown phonemes"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "validate", "--data-dir", "${DATA_DIR}", "--db-path", "${DB_PATH}", "--lang", "${LANG}", "--report"]
+
+# ─── Stats ────────────────────────────────────────────────────────────────────
+
+[tasks.stats]
+description = "Show pipeline statistics"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--bin", "ipa-pipeline", "--", "stats", "--db-path", "${DB_PATH}", "--lang", "${LANG}"]
+
+# ─── Server ───────────────────────────────────────────────────────────────────
+
+[tasks.server]
+description = "Start the GraphQL API server"
+command = "cargo"
+args = ["run", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--package", "ipa-server", "--bin", "ipa-server", "--", "--db-path", "${DB_PATH}", "--port", "${SERVER_PORT}", "--lang", "${LANG}", "--min-count", "${MIN_COUNT}"]
+
+[tasks.server-release]
+description = "Start the GraphQL API server (release build)"
+command = "cargo"
+args = ["run", "--release", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--package", "ipa-server", "--bin", "ipa-server", "--", "--db-path", "${DB_PATH}", "--port", "${SERVER_PORT}", "--lang", "${LANG}", "--min-count", "${MIN_COUNT}"]
+
+# ─── Frontend ─────────────────────────────────────────────────────────────────
+
+[tasks.web-install]
+description = "Install web (Three.js) dependencies"
+command = "npm"
+args = ["install"]
+cwd = "${WEB_DIR}"
+
+[tasks.web-dev]
+description = "Start web (Three.js) dev server"
+command = "npm"
+args = ["run", "dev"]
+cwd = "${WEB_DIR}"
+
+[tasks.web-build]
+description = "Build web (Three.js) for production"
+command = "npm"
+args = ["run", "build"]
+cwd = "${WEB_DIR}"
+
+[tasks.frontend-install]
+description = "Install frontend (React/R3F) dependencies"
+command = "npm"
+args = ["install"]
+cwd = "${FRONTEND_DIR}"
+
+[tasks.frontend-dev]
+description = "Start frontend (React/R3F) dev server"
+command = "npm"
+args = ["run", "dev"]
+cwd = "${FRONTEND_DIR}"
+
+[tasks.frontend-build]
+description = "Build frontend (React/R3F) for production"
+command = "npm"
+args = ["run", "build"]
+cwd = "${FRONTEND_DIR}"
+
+# ─── Rust Build & Test ────────────────────────────────────────────────────────
+
+[tasks.build]
+description = "Build the entire Rust workspace"
+command = "cargo"
+args = ["build", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml"]
+
+[tasks.build-release]
+description = "Build the Rust workspace in release mode"
+command = "cargo"
+args = ["build", "--release", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml"]
+
+[tasks.test]
+description = "Run all Rust tests"
+command = "cargo"
+args = ["test", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml"]
+
+[tasks.check]
+description = "Cargo check the workspace"
+command = "cargo"
+args = ["check", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml"]
+
+[tasks.clippy]
+description = "Run clippy on the workspace"
+command = "cargo"
+args = ["clippy", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml", "--", "-D", "warnings"]
+
+# ─── Composite Workflows ─────────────────────────────────────────────────────
+
+[tasks.pipeline]
+description = "Run full pipeline: download -> ingest -> build -> export"
+dependencies = ["download", "ingest", "build-trie", "export"]
+
+[tasks.pipeline-validated]
+description = "Full pipeline with PHOIBLE validation"
+dependencies = ["download", "ingest-validate", "build-trie", "export"]
+
+[tasks.dev]
+description = "Start server + frontend dev in parallel"
+run_task = { name = ["server", "frontend-dev"], parallel = true }
+
+[tasks.clean-db]
+description = "Remove the SurrealDB database"
+script = ["rm -rf ${DB_PATH}"]
+
+[tasks.clean]
+description = "Clean Rust build artifacts"
+command = "cargo"
+args = ["clean", "--manifest-path", "${PIPELINE_DIR}/Cargo.toml"]
+
+[tasks.clean-all]
+description = "Clean build artifacts, database, and output"
+dependencies = ["clean"]
+script = ["rm -rf ${DB_PATH} ${OUTPUT_DIR}"]
