@@ -12,48 +12,77 @@
 
 Color blending uses circular HSL mean: nodes shared across Romance and Germanic languages appear orange, while nodes dominated by one family pull toward red or yellow.
 
+## Prerequisites
+
+- [Rust](https://rustup.rs/) (edition 2024)
+- [cargo-make](https://github.com/sagiegurari/cargo-make) (`cargo install cargo-make`)
+- Node.js / npm
+
 ## Quick Start
 
 ```bash
-# 1. Download IPA dictionary data
-python3 scripts/download_data.py
+# Full pipeline: download → ingest → build trie → export JSON
+cargo make pipeline
 
-# 2. Build the trie (generates output/trie.json)
-python3 scripts/build_trie.py --min-count 50
-
-# 3. Run the web visualization
-cd web
-npm install
-npm run dev
+# Start the GraphQL server + React frontend
+cargo make dev
 ```
+
+Or step by step:
+
+```bash
+cargo make download          # Fetch data (WikiPron, CMU Dict, PHOIBLE)
+cargo make ingest            # Ingest into SurrealDB (embedded RocksDB)
+cargo make build-trie        # Build trie structures
+cargo make export            # Export trie, essay data, and stats as JSON
+
+cargo make server            # Start GraphQL API on :3001
+cargo make frontend-dev      # Start React/R3F dev server
+```
+
+See `Makefile.toml` for all available tasks and configuration.
 
 ## Data Pipeline
 
-- **Source**: [open-dict-data/ipa-dict](https://github.com/open-dict-data/ipa-dict) (CC BY-SA)
-- **Tokenizer**: Greedy left-to-right — base char + combining diacritics/modifiers = one phoneme. All diacritics preserved (stress, length, nasalization, etc.)
-- **Trie**: Each node tracks per-language appearance counts (how many words pass through that node)
-- **Layout**: Radial spherical tree — root at origin, depth levels on concentric shells, golden spiral distribution
-- **Pruning**: `--min-count` flag removes infrequent nodes (recommended: 50+)
+**Sources**: [open-dict-data/ipa-dict](https://github.com/open-dict-data/ipa-dict) (CC BY-SA), WikiPron, CMU Pronouncing Dictionary, PHOIBLE phoneme inventories
 
-## Visualization
+**Pipeline** (`ipa-pipeline/`): Rust workspace using SurrealDB (embedded, RocksDB-backed) for storage.
 
-- **Three.js** with InstancedMesh for ~33k spheres
-- **Color**: Circular HSL mean weighted by language counts — visually reveals language family clustering
-- **Interaction**: Hover tooltips with per-language breakdowns, language toggle checkboxes, depth and frequency sliders
-- **Labels**: Sprite-based IPA text for high-frequency nodes near camera
+| Crate | Role |
+|-------|------|
+| `ipa-core` | IPA tokenizer, Unicode normalizer, phoneme inventory |
+| `ipa-ingest` | Data download (WikiPron, CMU, PHOIBLE) and ingestion |
+| `ipa-db` | SurrealDB schema and queries |
+| `ipa-trie` | Trie construction, entropy analysis, motif detection |
+| `ipa-export` | JSON export (trie layout, essay data, cross-linguistic stats) |
+| `ipa-server` | GraphQL API server |
+
+**Tokenizer**: Greedy left-to-right — base char + combining diacritics/modifiers = one phoneme. Tie bars join affricates. All diacritics preserved (stress, length, nasalization, etc.).
+
+**Layout**: Radial spherical tree — root at origin, depth levels on concentric shells, golden spiral distribution.
+
+## Frontends
+
+Two visualization frontends exist:
+
+- **`frontend/`** — React + React Three Fiber (R3F). Active development. Zustand state management, level-of-detail rendering, search, glow effects, label overlays. Connects to the GraphQL server.
+- **`web/`** — Vanilla Three.js + TypeScript. Original prototype. Reads static `trie.json` from `output/`.
 
 ## Structure
 
 ```
-scripts/
-  download_data.py    # Fetch TSVs from ipa-dict
-  build_trie.py       # Tokenize → trie → layout → JSON
-web/
-  src/
-    main.ts           # Scene + controls + render loop
-    types.ts          # TypeScript interfaces
-    data/             # Data loading
-    rendering/        # Node, Edge, Label renderers
-    color/            # Language palette + circular HSL blending
-    interaction/      # Tooltip, FilterPanel, Picker
+ipa-pipeline/               # Rust workspace
+  crates/
+    ipa-core/               #   IPA tokenizer + normalizer
+    ipa-ingest/             #   Data download + ingestion
+    ipa-db/                 #   SurrealDB schema + queries
+    ipa-trie/               #   Trie building + analysis
+    ipa-export/             #   JSON export
+    ipa-server/             #   GraphQL API
+  data/                     #   Downloaded source data + SurrealDB store
+frontend/                   # React/R3F visualization (active)
+web/                        # Vanilla Three.js visualization (prototype)
+scripts/                    # Legacy Python scripts
+output/                     # Exported JSON (trie, essay, stats)
+Makefile.toml               # cargo-make task runner
 ```

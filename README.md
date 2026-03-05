@@ -10,7 +10,7 @@ Exhaustive enumeration of combinatory logic terms up to size 7. Measuring what h
 
 ### [02: IPA Trie Visualization](projects/02-ipa-trie-visualization/)
 
-3D visualization of a phonological trie across five languages (English, French, Spanish, German, Dutch). Colors blend by language family using circular HSL means, revealing shared phonological structure through Three.js.
+3D visualization of a phonological trie across five languages (English, French, Spanish, German, Dutch). Rust pipeline ingests IPA dictionary data (WikiPron, CMU Dict, PHOIBLE) into SurrealDB, builds tries with entropy/motif analysis, and serves them via GraphQL. React Three Fiber frontend renders ~33k nodes with colors blended by language family using circular HSL means.
 
 ## Structure
 

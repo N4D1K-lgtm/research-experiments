@@ -1,7 +1,6 @@
 # Rust
-/target
+**/target/
 Cargo.lock
-*.db
 
 # Python
 __pycache__/
@@ -33,10 +32,11 @@ docs/vendor/
 *.blg
 
 # Project 02
-projects/02-ipa-trie-visualization/data/
 projects/02-ipa-trie-visualization/output/
 projects/02-ipa-trie-visualization/web/node_modules/
 projects/02-ipa-trie-visualization/web/dist/
+projects/02-ipa-trie-visualization/frontend/node_modules/
+projects/02-ipa-trie-visualization/frontend/dist/
 
 # OS
 .DS_Store
